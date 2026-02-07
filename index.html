@@ -1,15 +1,47 @@
 <!DOCTYPE html>
 <html lang="en-US">
-  <head>
-    <title>My File Storage</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  </head>
-  <body>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
-    <script src="firebase-config.js"></script>
-    <script src="script.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My File Storage</title>
+</head>
+<body>
+  <h1>My File Storage (Free Tier)</h1>
+
+  <!-- Auth -->
+  <div id="auth">
+    <input type="text" id="signupName" placeholder="Display Name">
+    <input type="email" id="signupEmail" placeholder="Email">
+    <input type="password" id="signupPass" placeholder="Password">
+    <button onclick="signUp(document.getElementById('signupEmail').value, document.getElementById('signupPass').value, document.getElementById('signupName').value)">Sign Up</button>
+    <br><br>
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPass" placeholder="Password">
+    <button onclick="login(document.getElementById('loginEmail').value, document.getElementById('loginPass').value)">Login</button>
+  </div>
+
+  <hr>
+
+  <!-- Upload -->
+  <div id="upload">
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile(document.getElementById('fileInput').files[0])">Upload File</button>
+  </div>
+
+  <hr>
+
+  <!-- List Files -->
+  <div id="files">
+    <button onclick="listFiles()">List My Files (Check Console)</button>
+    <ul id="fileList"></ul>
+  </div>
+
+  <!-- Firebase Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
