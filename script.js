@@ -1,46 +1,51 @@
-// script.js
-
-// 1. Signup / Login
+// =======================
+// Auth functions
+// =======================
 async function signUp(email, password, displayName) {
   const userCredential = await auth.createUserWithEmailAndPassword(email, password);
   const user = userCredential.user;
 
-  // Create user doc in Firestore
   await db.collection("users").doc(user.uid).set({
     name: displayName,
     email: email,
     storageUsed: 0,
-    freeLimit: 100 * 1024 * 1024 // 100 MB
+    freeLimit: 100 * 1024 * 1024, // 100 MB
+    role: "user" // default role
   });
 
-  console.log("User signed up and Firestore doc created:", user.uid);
+  console.log("User signed up:", user.uid);
+  monitorFiles(); // start file monitoring
 }
 
 async function login(email, password) {
   const userCredential = await auth.signInWithEmailAndPassword(email, password);
-  console.log("User logged in:", userCredential.user.uid);
-  return userCredential.user;
+  const user = userCredential.user;
+  console.log("User logged in:", user.uid);
+
+  monitorFiles(); // monitor files in real-time
+  monitorUsers(); // if admin, monitor all users
+
+  return user;
 }
 
-// 2. Upload File
+// =======================
+// File functions
+// =======================
 async function uploadFile(file) {
   const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in");
+  if (!user) return alert("Not logged in");
 
-  // Check storageUsed
   const userDoc = await db.collection("users").doc(user.uid).get();
   const userData = userDoc.data();
+
   if (userData.storageUsed + file.size > userData.freeLimit) {
-    alert("You reached your free storage limit. Upgrade to premium.");
-    return;
+    return alert("You reached your free storage limit. Upgrade to premium.");
   }
 
-  // Upload to Firebase Storage
   const storageRef = storage.ref(`user_files/${user.uid}/${file.name}`);
   const snapshot = await storageRef.put(file);
   const downloadURL = await snapshot.ref.getDownloadURL();
 
-  // Store metadata in Firestore
   const fileDoc = await db.collection("files").add({
     ownerId: user.uid,
     fileName: file.name,
@@ -50,45 +55,126 @@ async function uploadFile(file) {
     downloadUrl: downloadURL
   });
 
-  // Update user storageUsed
   await db.collection("users").doc(user.uid).update({
     storageUsed: firebase.firestore.FieldValue.increment(file.size)
   });
 
-  console.log("File uploaded and Firestore doc created:", fileDoc.id);
+  console.log("File uploaded:", fileDoc.id);
 }
 
-// 3. List Files
-async function listFiles() {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in");
-
-  const filesSnapshot = await db.collection("files")
-    .where("ownerId", "==", user.uid)
-    .orderBy("uploadTime", "desc")
-    .get();
-
-  filesSnapshot.forEach(doc => {
-    console.log(doc.id, doc.data());
-  });
-}
-
-// 4. Delete File
 async function deleteFile(fileId) {
   const fileDoc = await db.collection("files").doc(fileId).get();
   const data = fileDoc.data();
 
-  // Delete from Storage
+  // Delete from storage
   const storageRef = storage.refFromURL(data.downloadUrl);
   await storageRef.delete();
 
   // Delete Firestore doc
   await db.collection("files").doc(fileId).delete();
 
-  // Update user storageUsed
+  // Update user storage
   await db.collection("users").doc(data.ownerId).update({
     storageUsed: firebase.firestore.FieldValue.increment(-data.size)
   });
 
   console.log("File deleted:", fileId);
+}
+
+// =======================
+// Real-time file monitoring
+// =======================
+function monitorFiles() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  db.collection("files")
+    .where("ownerId", "==", user.uid)
+    .orderBy("uploadTime", "desc")
+    .onSnapshot(snapshot => {
+      const fileList = document.getElementById("fileList");
+      fileList.innerHTML = "";
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const li = document.createElement("li");
+        li.textContent = `${data.fileName} (${(data.size/1024).toFixed(1)} KB)`;
+
+        const a = document.createElement("a");
+        a.href = data.downloadUrl;
+        a.textContent = " [Download]";
+        a.target = "_blank";
+        li.appendChild(a);
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Delete";
+        delBtn.onclick = () => deleteFile(doc.id);
+        li.appendChild(delBtn);
+
+        fileList.appendChild(li);
+      });
+    });
+}
+
+// =======================
+// Admin monitoring
+// =======================
+function monitorUsers() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  db.collection("users").doc(user.uid).get().then(doc => {
+    if (doc.data().role !== "admin") return; // only admins
+
+    db.collection("users").onSnapshot(snapshot => {
+      const userList = document.getElementById("userList");
+      if (!userList) return;
+      userList.innerHTML = "";
+
+      snapshot.forEach(userDoc => {
+        const data = userDoc.data();
+        const li = document.createElement("li");
+        li.textContent = `User: ${data.name}, Email: ${data.email}, Used: ${(data.storageUsed/1024/1024).toFixed(1)} MB`;
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Delete User";
+        delBtn.onclick = () => deleteUser(userDoc.id);
+        li.appendChild(delBtn);
+
+        userList.appendChild(li);
+      });
+    });
+  });
+}
+
+// =======================
+// Admin add/delete users
+// =======================
+async function addUser(email, password, displayName) {
+  const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+  const user = userCredential.user;
+
+  await db.collection("users").doc(user.uid).set({
+    name: displayName,
+    email: email,
+    storageUsed: 0,
+    freeLimit: 100 * 1024 * 1024,
+    role: "user"
+  });
+
+  console.log("Admin created new user:", user.uid);
+}
+
+async function deleteUser(userId) {
+  if (!confirm("Delete this user and all their files?")) return;
+
+  const filesSnapshot = await db.collection("files").where("ownerId", "==", userId).get();
+  for (let doc of filesSnapshot.docs) {
+    const fileData = doc.data();
+    await storage.refFromURL(fileData.downloadUrl).delete();
+    await db.collection("files").doc(doc.id).delete();
+  }
+
+  await db.collection("users").doc(userId).delete();
+  console.log(`User ${userId} deleted (Firestore + files). Auth deletion requires Admin SDK.`);
 }
