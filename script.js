@@ -2,30 +2,30 @@
 // Auth functions
 // =======================
 async function signUp(email, password, displayName) {
-  const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-  const user = userCredential.user;
-
-  await db.collection("users").doc(user.uid).set({
-    name: displayName,
-    email: email,
-    storageUsed: 0,
-    freeLimit: 100 * 1024 * 1024, // 100 MB
-    role: "user" // default role
-  });
-
-  console.log("User signed up:", user.uid);
-  monitorFiles(); // start file monitoring
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, password);
+    await db.collection("users").doc(cred.user.uid).set({
+      name: displayName,
+      email,
+      storageUsed: 0,
+      freeLimit: 100 * 1024 * 1024,
+      role: "user"
+    });
+    console.log("Signup success");
+  } catch (err) {
+    console.error("Signup error:", err.message);
+  }
 }
 
 async function login(email, password) {
-  const userCredential = await auth.signInWithEmailAndPassword(email, password);
-  const user = userCredential.user;
-  console.log("User logged in:", user.uid);
-
-  monitorFiles(); // monitor files in real-time
-  monitorUsers(); // if admin, monitor all users
-
-  return user;
+  try {
+    const cred = await auth.signInWithEmailAndPassword(email, password);
+    console.log("Login success:", cred.user.uid);
+    monitorFiles();
+    monitorUsers();
+  } catch (err) {
+    console.error("Login error:", err.message);
+  }
 }
 
 // =======================
