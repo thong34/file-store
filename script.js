@@ -175,7 +175,11 @@ async function deleteUser(userId) {
     await db.collection("files").doc(doc.id).delete();
   }
 
-  document.getElementById("signupBtn").addEventListener("click", () => {
+  await db.collection("users").doc(userId).delete();
+  console.log(`User ${userId} deleted (Firestore + files). Auth deletion requires Admin SDK.`);
+}
+
+ document.getElementById("signupBtn").addEventListener("click", () => {
   const name = document.getElementById("signupName").value;
   const email = document.getElementById("signupEmail").value;
   const pass = document.getElementById("signupPass").value;
@@ -187,8 +191,3 @@ document.getElementById("loginBtn").addEventListener("click", () => {
   const pass = document.getElementById("loginPass").value;
   login(email, pass);
 });
-
-
-  await db.collection("users").doc(userId).delete();
-  console.log(`User ${userId} deleted (Firestore + files). Auth deletion requires Admin SDK.`);
-}
